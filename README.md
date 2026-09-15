@@ -31,22 +31,35 @@
 - 学校站点登录后的 HTTP 跳转例外仅限 `gsmis.njust.edu.cn` 域名；应用其余位置不允许明文流量。
 - 请勿把真实账号、密码、Cookie、私钥、签名文件或访问令牌写入源码、测试数据、日志或 Git 历史。
 
-## 技术结构
+## 项目结构
 
 项目使用 Kotlin 和原生 Android WebView，最低支持 Android 8.0（API 26）。首页为随 APK 打包的 HTML/CSS/JavaScript，不依赖远程前端资源。
 
 ```text
-app/src/main/
-├── AndroidManifest.xml
-├── assets/index.html
-├── java/cn/edu/njust/kezaizhangxin/
-│   ├── MainActivity.kt
-│   └── ScheduleNotificationReceiver.kt
-└── res/
-    ├── drawable-nodpi/ic_launcher.png
-    ├── values/styles.xml
-    └── xml/network_security_config.xml
+.
+├── app/
+│   ├── build.gradle.kts
+│   └── src/main/
+│       ├── AndroidManifest.xml
+│       ├── assets/index.html
+│       ├── java/cn/edu/njust/kezaizhangxin/
+│       │   ├── MainActivity.kt
+│       │   └── ScheduleNotificationReceiver.kt
+│       └── res/
+│           ├── drawable-nodpi/ic_launcher.png
+│           ├── values/styles.xml
+│           └── xml/network_security_config.xml
+├── gradle/wrapper/
+├── release/
+│   ├── KeZaiZhangXin-v1.0.0.apk
+│   └── KeZaiZhangXin-v1.0.0.apk.sha256
+├── build.gradle.kts
+├── settings.gradle.kts
+├── gradlew
+└── gradlew.bat
 ```
+
+`release/` 保存供普通用户下载的版本化安装包；Gradle 缓存、构建输出、IDE 配置、日志和本机验证截图均由 `.gitignore` 排除，可随时重新生成。
 
 - `MainActivity.kt`：创建首页与学校 WebView，处理登录、验证码、课表抓取、本地存储和 JavaScript 桥接。
 - `index.html`：课程解析、周次过滤、页面渲染、交互与登录/验证码弹窗。
@@ -79,54 +92,55 @@ app/src/main/
 - 包名：`cn.edu.njust.kezaizhangxin`
 - 当前版本：`1.0.0`（`versionCode 2`）
 
-本机需要在未提交的 `local.properties` 中配置 Android SDK，例如：
+推荐直接使用 Android Studio 打开项目，它会在本机生成不提交到 Git 的 `local.properties`。也可手动配置 Android SDK，例如：
 
 ```properties
-sdk.dir=C\:\\path\\to\\Android\\Sdk
+sdk.dir=/path/to/Android/Sdk
 ```
 
 ## 构建
 
-PowerShell 下构建 debug APK：
+首次构建需要联网下载 Gradle 和 Android 依赖。依赖准备完成后，可在 Android Studio 中构建，也可使用项目自带的 Gradle Wrapper。
+
+Windows PowerShell：
 
 ```powershell
-$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
-$env:Path="$env:JAVA_HOME\bin;$env:Path"
-$env:GRADLE_USER_HOME='C:\Users\phynix\.gradle'
-.\gradlew.bat :app:assembleDebug --no-daemon --offline --console=plain
+.\gradlew.bat :app:assembleDebug
 ```
 
-输出文件：
+macOS / Linux：
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+debug APK 输出到：
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-当前离线缓存缺少 Android Lint 工件，release 构建需要跳过 lint 链：
+构建 release APK：
 
 ```powershell
-.\gradlew.bat :app:assembleRelease `
-  -x :app:lintVitalAnalyzeRelease `
-  -x :app:lintVitalReportRelease `
-  -x :app:lintVitalRelease `
-  --no-daemon --offline --console=plain
+.\gradlew.bat :app:assembleRelease
 ```
 
-输出文件：
+release APK 输出到：
 
 ```text
 app/build/outputs/apk/release/app-release.apk
 ```
 
-当前 release 变体使用本机 debug keystore 签名，仅适合开发测试和直接安装。发布到应用商店前，必须配置独立的生产签名，并通过安全的本机配置或 CI Secret 注入签名信息，不能提交 keystore 或密码。
+当前 release 变体使用 debug keystore 签名，适合开发测试和同学间直接安装。发布到应用商店前，必须配置独立的生产签名，并通过安全的本机配置或 CI Secret 注入签名信息，不能提交 keystore 或密码。
 
 ## 安装与调试
 
-模拟器或设备在线后可执行：
+确保 Android SDK 的 `platform-tools` 已加入 `PATH`。设备或模拟器在线后可执行：
 
 ```powershell
-C:\Users\phynix\AppData\Local\Android\Sdk\platform-tools\adb.exe `
-  -s emulator-5554 install -r app\build\outputs\apk\debug\app-debug.apk
+adb devices
+adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
 调试同步功能需要能够访问学校系统。不要在测试截图、日志或问题报告中暴露账号、验证码、Cookie 或个人课表信息。
