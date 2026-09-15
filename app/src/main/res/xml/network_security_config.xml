@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- The university system redirects authenticated users to HTTP. Limit this
+         exception to its exact domain instead of allowing cleartext globally. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">gsmis.njust.edu.cn</domain>
+    </domain-config>
+</network-security-config>
