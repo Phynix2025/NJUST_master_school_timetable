@@ -4,6 +4,13 @@
 
 > 一切数据以学校官网为准。本项目不是南京理工大学官方应用。
 
+## 下载
+
+- [下载课在掌心 v1.0.0 APK](release/KeZaiZhangXin-v1.0.0.apk)
+- [查看 SHA-256 校验和](release/KeZaiZhangXin-v1.0.0.apk.sha256)
+
+当前 APK 使用 Android debug keystore 签名，可直接安装给同学测试使用，但不适合发布到应用商店。Android 可能要求允许浏览器或文件管理器“安装未知应用”。从其他来源获得 APK 时，请先核对 SHA-256 校验和。
+
 ## 功能
 
 - 后台访问 `gsmis.njust.edu.cn`，同步“课务管理 → 学期课表信息查询”中的课程。
