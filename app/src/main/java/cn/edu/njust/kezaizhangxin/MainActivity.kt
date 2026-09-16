@@ -3,11 +3,23 @@ package cn.edu.njust.kezaizhangxin
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.GeomagneticField
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -15,6 +27,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import org.json.JSONArray
+import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
@@ -28,16 +42,65 @@ class MainActivity : Activity() {
     private lateinit var schoolWebView: WebView
     private val prefs by lazy { getSharedPreferences("schedule", MODE_PRIVATE) }
     private val credentialPrefs by lazy { getSharedPreferences("credentials", MODE_PRIVATE) }
+    private val courseDetailPrefs by lazy { getSharedPreferences("course_details", MODE_PRIVATE) }
+    private val locationManager by lazy { getSystemService(LocationManager::class.java) }
+    private val sensorManager by lazy { getSystemService(SensorManager::class.java) }
     private var pendingCredentials: Credentials? = null
     private var captchaImage: String = ""
+    private var locationRequested = false
+    private var mapOpen = false
+    private var courseDetailOpen = false
+    private var imagePreviewOpen = false
+    private var pendingImageCourseKey: String? = null
+    private var lastLocation: Location? = null
+    private var lastHeadingPublishTime = 0L
+
+    private val locationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) = publishLocation(location)
+        override fun onProviderDisabled(provider: String) {
+            if (locationRequested && !hasEnabledLocationProvider()) notifyHome("onLocationUnavailable")
+        }
+    }
+
+    private val headingListener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            if (!mapOpen || event.sensor.type != Sensor.TYPE_ROTATION_VECTOR) return
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastHeadingPublishTime < HEADING_PUBLISH_INTERVAL_MS) return
+            val rotationMatrix = FloatArray(9)
+            val adjustedMatrix = FloatArray(9)
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+            val (xAxis, yAxis) = when (currentDisplayRotation()) {
+                Surface.ROTATION_90 -> SensorManager.AXIS_Y to SensorManager.AXIS_MINUS_X
+                Surface.ROTATION_180 -> SensorManager.AXIS_MINUS_X to SensorManager.AXIS_MINUS_Y
+                Surface.ROTATION_270 -> SensorManager.AXIS_MINUS_Y to SensorManager.AXIS_X
+                else -> SensorManager.AXIS_X to SensorManager.AXIS_Y
+            }
+            if (!SensorManager.remapCoordinateSystem(rotationMatrix, xAxis, yAxis, adjustedMatrix)) return
+            val magneticHeading = Math.toDegrees(SensorManager.getOrientation(adjustedMatrix, FloatArray(3))[0].toDouble())
+            val declination = lastLocation?.let { location ->
+                GeomagneticField(
+                    location.latitude.toFloat(),
+                    location.longitude.toFloat(),
+                    location.altitude.toFloat(),
+                    location.time.takeIf { it > 0L } ?: System.currentTimeMillis()
+                ).declination
+            } ?: 0f
+            val trueHeading = (magneticHeading + declination + 360.0) % 360.0
+            lastHeadingPublishTime = now
+            notifyHome("onNativeHeading", trueHeading)
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
 
     private data class Credentials(val username: String, val password: String)
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        schoolWebView = createWebView()
-        webView = createWebView()
+        schoolWebView = createWebView(SchoolBridge(), SchoolWebViewClient())
+        webView = createWebView(HomeBridge(), WebViewClient())
         setContentView(android.widget.FrameLayout(this).apply {
             // The school WebView is kept behind the home screen. It can finish a
             // valid session refresh without exposing the school's intermediate UI.
@@ -45,18 +108,122 @@ class MainActivity : Activity() {
             addView(webView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         })
         webView.loadUrl("file:///android_asset/index.html")
-        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9)
+        if (Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, ::handleBackNavigation)
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9)
+        }
+        NotificationScheduler.ensureChannel(this)
         NotificationScheduler.schedule(this)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun createWebView(): WebView = WebView(this).apply {
+    private fun createWebView(bridge: Any, client: WebViewClient): WebView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.userAgentString = settings.userAgentString + " KeZaiZhangXin/0.1"
-            addJavascriptInterface(Bridge(), "Android")
-            webViewClient = SchoolWebViewClient()
+            addJavascriptInterface(bridge, "Android")
+            webViewClient = client
         }
+
+    private fun requestForegroundLocation() {
+        locationRequested = true
+        val fine = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarse = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!fine && !coarse) {
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), LOCATION_PERMISSION_REQUEST)
+            return
+        }
+        startLocationUpdates()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startLocationUpdates() {
+        if (!locationRequested) return
+        val permitted = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!permitted) {
+            locationRequested = false
+            notifyHome("onLocationPermissionDenied")
+            return
+        }
+        runCatching { locationManager.removeUpdates(locationListener) }
+        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .filter { provider -> runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false) }
+        if (providers.isEmpty()) {
+            notifyHome("onLocationUnavailable")
+            return
+        }
+        providers.mapNotNull { provider -> runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull() }
+            .maxByOrNull(Location::getTime)
+            ?.let(::publishLocation)
+        providers.forEach { provider -> runCatching { locationManager.requestLocationUpdates(provider, 2_000L, 1f, locationListener) } }
+    }
+
+    private fun hasEnabledLocationProvider(): Boolean =
+        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .any { provider -> runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false) }
+
+    private fun publishLocation(location: Location) {
+        if (!locationRequested) return
+        lastLocation = location
+        notifyHome("onNativeLocation", location.latitude, location.longitude, location.accuracy, location.time)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun currentDisplayRotation(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display?.rotation ?: Surface.ROTATION_0
+        else windowManager.defaultDisplay.rotation
+
+    private fun startHeadingUpdates() {
+        if (!mapOpen) return
+        val sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return
+        sensorManager.unregisterListener(headingListener)
+        sensorManager.registerListener(headingListener, sensor, SensorManager.SENSOR_DELAY_GAME)
+    }
+
+    private fun stopHeadingUpdates() {
+        sensorManager.unregisterListener(headingListener)
+        lastHeadingPublishTime = 0L
+    }
+
+    private fun notifyHome(function: String, vararg values: Number) {
+        if (!::webView.isInitialized) return
+        val arguments = values.joinToString(",") { it.toString() }
+        runOnUiThread { webView.evaluateJavascript("window.$function && window.$function($arguments)", null) }
+    }
+
+    private fun stopLocationUpdates(clearRequest: Boolean) {
+        runCatching { locationManager.removeUpdates(locationListener) }
+        if (clearRequest) locationRequested = false
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (locationRequested) startLocationUpdates()
+        if (mapOpen) startHeadingUpdates()
+    }
+
+    override fun onPause() {
+        stopLocationUpdates(clearRequest = false)
+        stopHeadingUpdates()
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        stopLocationUpdates(clearRequest = true)
+        stopHeadingUpdates()
+        super.onDestroy()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != LOCATION_PERMISSION_REQUEST) return
+        if (grantResults.any { it == PackageManager.PERMISSION_GRANTED }) startLocationUpdates()
+        else {
+            locationRequested = false
+            notifyHome("onLocationPermissionDenied")
+        }
+    }
 
     private fun beginSync() {
         val credentials = pendingCredentials ?: loadCredentials()
@@ -192,7 +359,70 @@ class MainActivity : Activity() {
         return String(cipher.doFinal(Base64.decode(parts[1], Base64.NO_WRAP)), StandardCharsets.UTF_8)
     }
 
-    private fun jsString(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
+    private fun jsString(value: String): String = JSONObject.quote(value)
+
+    private fun validCourseKey(value: String): String? = value.trim().takeIf { it.isNotEmpty() && it.length <= 500 }
+
+    private fun readCourseDetails(courseKey: String): JSONObject {
+        val key = validCourseKey(courseKey) ?: return JSONObject().put("text", "").put("images", JSONArray())
+        return runCatching { JSONObject(courseDetailPrefs.getString(key, "") ?: "") }
+            .getOrElse { JSONObject() }
+            .apply {
+                if (!has("text")) put("text", "")
+                if (optJSONArray("images") == null) put("images", JSONArray())
+            }
+    }
+
+    private fun writeCourseDetails(courseKey: String, details: JSONObject) {
+        val key = validCourseKey(courseKey) ?: return
+        val text = details.optString("text")
+        val images = details.optJSONArray("images") ?: JSONArray()
+        if (text.isEmpty() && images.length() == 0) courseDetailPrefs.edit().remove(key).apply()
+        else courseDetailPrefs.edit().putString(key, details.toString()).apply()
+    }
+
+    private fun chooseCourseImages(courseKey: String) {
+        val key = validCourseKey(courseKey) ?: return
+        pendingImageCourseKey = key
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        runCatching { startActivityForResult(intent, COURSE_IMAGE_REQUEST) }
+            .onFailure {
+                pendingImageCourseKey = null
+                Toast.makeText(this, "无法打开图片选择器", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != COURSE_IMAGE_REQUEST) return
+        val courseKey = pendingImageCourseKey.also { pendingImageCourseKey = null } ?: return
+        if (resultCode != RESULT_OK || data == null) return
+        val selected = buildList {
+            data.clipData?.let { clip -> for (index in 0 until clip.itemCount) add(clip.getItemAt(index).uri) }
+            data.data?.let(::add)
+        }.distinct()
+        if (selected.isEmpty()) return
+
+        val details = readCourseDetails(courseKey)
+        val images = details.getJSONArray("images")
+        val existing = (0 until images.length()).mapNotNull { images.optString(it).takeIf(String::isNotBlank) }.toMutableSet()
+        selected.forEach { uri ->
+            if (uri.scheme != "content") return@forEach
+            runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            if (existing.add(uri.toString()) && existing.size <= MAX_IMAGES_PER_COURSE) images.put(uri.toString())
+        }
+        writeCourseDetails(courseKey, details)
+        webView.evaluateJavascript(
+            "window.onCourseImagesChanged && window.onCourseImagesChanged(${jsString(courseKey)}, ${jsString(details.toString())})",
+            null
+        )
+    }
 
     private inner class SchoolWebViewClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
@@ -256,14 +486,26 @@ class MainActivity : Activity() {
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (webView.visibility != View.VISIBLE) {
+    override fun onBackPressed() = handleBackNavigation()
+
+    private fun handleBackNavigation() {
+        if (imagePreviewOpen) {
+            imagePreviewOpen = false
+            webView.evaluateJavascript("window.closeImagePreviewFromNative && window.closeImagePreviewFromNative()", null)
+        } else if (courseDetailOpen) {
+            courseDetailOpen = false
+            webView.evaluateJavascript("window.closeCourseDetailFromNative && window.closeCourseDetailFromNative()", null)
+        } else if (mapOpen) {
+            mapOpen = false
+            stopLocationUpdates(clearRequest = true)
+            webView.evaluateJavascript("window.closeMapFromNative && window.closeMapFromNative()", null)
+        } else if (webView.visibility != View.VISIBLE) {
             webView.visibility = View.VISIBLE
             webView.loadUrl("file:///android_asset/index.html")
-        } else super.onBackPressed()
+        } else finish()
     }
 
-    inner class Bridge {
+    inner class HomeBridge {
         @JavascriptInterface fun beginSync() = runOnUiThread { this@MainActivity.beginSync() }
         @JavascriptInterface fun login(username: String, password: String) = runOnUiThread {
             if (username.isBlank() || password.isBlank()) return@runOnUiThread
@@ -271,11 +513,6 @@ class MainActivity : Activity() {
             this@MainActivity.beginSync()
         }
         @JavascriptInterface fun hasCredentials(): Boolean = loadCredentials() != null
-        @JavascriptInterface fun captchaRequired(image: String) = runOnUiThread {
-            captchaImage = image
-            webView.visibility = View.VISIBLE
-            webView.loadUrl("file:///android_asset/index.html?sync=captcha")
-        }
         @JavascriptInterface fun getCaptchaImage(): String = captchaImage
         @JavascriptInterface fun refreshCaptcha() = runOnUiThread {
             schoolWebView.evaluateJavascript("""
@@ -310,6 +547,40 @@ class MainActivity : Activity() {
             """.trimIndent(), null)
         }
         @JavascriptInterface fun getSchedule(): String = prefs.getString("data", "") ?: ""
+        @JavascriptInterface fun getCourseDetails(courseKey: String): String = readCourseDetails(courseKey).toString()
+        @JavascriptInterface fun saveCourseText(courseKey: String, text: String) {
+            if (text.length > MAX_COURSE_TEXT_LENGTH) return
+            writeCourseDetails(courseKey, readCourseDetails(courseKey).put("text", text))
+        }
+        @JavascriptInterface fun chooseCourseImages(courseKey: String) = runOnUiThread { this@MainActivity.chooseCourseImages(courseKey) }
+        @JavascriptInterface fun removeCourseImage(courseKey: String, imageUri: String) {
+            if (!imageUri.startsWith("content://")) return
+            val details = readCourseDetails(courseKey)
+            val current = details.getJSONArray("images")
+            val kept = JSONArray()
+            for (index in 0 until current.length()) {
+                val value = current.optString(index)
+                if (value != imageUri) kept.put(value)
+            }
+            details.put("images", kept)
+            writeCourseDetails(courseKey, details)
+        }
+        @JavascriptInterface fun setCourseDetailOpen(open: Boolean) = runOnUiThread { courseDetailOpen = open }
+        @JavascriptInterface fun setImagePreviewOpen(open: Boolean) = runOnUiThread { imagePreviewOpen = open }
+        @JavascriptInterface fun setMapOpen(open: Boolean) = runOnUiThread {
+            mapOpen = open
+            if (open) startHeadingUpdates() else stopHeadingUpdates()
+        }
+        @JavascriptInterface fun requestLocation() = runOnUiThread { requestForegroundLocation() }
+        @JavascriptInterface fun stopLocation() = runOnUiThread { stopLocationUpdates(clearRequest = true) }
+    }
+
+    inner class SchoolBridge {
+        @JavascriptInterface fun captchaRequired(image: String) = runOnUiThread {
+            captchaImage = image
+            webView.visibility = View.VISIBLE
+            webView.loadUrl("file:///android_asset/index.html?sync=captcha")
+        }
         @JavascriptInterface fun readSchedule() = runOnUiThread { extractSchedule(schoolWebView) }
         @JavascriptInterface fun storeSchedule(json: String) = runOnUiThread {
             prefs.edit().putString("data", json).apply()
@@ -320,5 +591,13 @@ class MainActivity : Activity() {
         @JavascriptInterface fun syncFailed(message: String) = runOnUiThread {
             showSyncFailure(message)
         }
+    }
+
+    companion object {
+        private const val LOCATION_PERMISSION_REQUEST = 10
+        private const val COURSE_IMAGE_REQUEST = 11
+        private const val MAX_IMAGES_PER_COURSE = 50
+        private const val MAX_COURSE_TEXT_LENGTH = 100_000
+        private const val HEADING_PUBLISH_INTERVAL_MS = 80L
     }
 }

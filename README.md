@@ -1,183 +1,46 @@
 # 课在掌心
 
-一个面向南京理工大学研究生的本地 Android 课程表应用。应用通过隐藏的 WebView 登录学校研究生管理系统，在用户完成学校要求的验证码后同步课表，并在本地提供“今天 / 明天 / 本周”视图和课程提醒。
-
-> 一切数据以学校官网为准。本项目不是南京理工大学官方应用。
+面向南京理工大学研究生的本地 Android 课程表应用。同步数据来自学校研究生管理系统，本项目不是学校官方应用，一切课程信息以学校官网为准。
 
 ## 下载
 
-- [下载课在掌心 v1.0.0 APK](release/KeZaiZhangXin-v1.0.0.apk)
-- [查看 SHA-256 校验和](release/KeZaiZhangXin-v1.0.0.apk.sha256)
+[下载 v2.0.0 APK](https://github.com/Phynix2025/NJUST_master_school_timetable/releases/download/v2.0.0/KeZaiZhangXin-v2.0.0.apk)
 
-当前 APK 使用 Android debug keystore 签名，可直接安装给同学测试使用，但不适合发布到应用商店。Android 可能要求允许浏览器或文件管理器“安装未知应用”。从其他来源获得 APK 时，请先核对 SHA-256 校验和。
+当前发布包使用开发签名，适合个人和同学间测试，不用于应用商店发布。最低支持 Android 8.0。
 
-## 功能
+## 核心功能
 
-- 后台访问 `gsmis.njust.edu.cn`，同步“课务管理 → 学期课表信息查询”中的课程。
-- 从学校教学日历读取学期第 1 周周一，按日期过滤实际上课周次。
-- 展示下一节课、上课时间、节次、地点、教师和周次。
-- 支持左右滑动切换“今天 / 明天 / 本周”。
-- 本周课程按“进行中、未开始、已完成”排列，已完成课程置底并弱化。
-- 周一至周四 22:00 提醒次日最早课程；无课时发送休息提示。
-- 每节课开始前 20 分钟发送课程提醒。
-- Android 13 及以上版本运行时请求通知权限；无法使用精确闹钟时自动降级。
-- 设备重启后重新建立提醒。
+- 查看今天、明天、本周课程及下一节课。
+- 课程开始前 20 分钟提醒，晚间提示次日最早课程。
+- 课程详情支持自动保存笔记和多张图片；图片可全屏查看、缩放和拖动。
+- 内置离线校园地图，支持建筑搜索、定位、精度范围、目标标记和当前朝向。
+- 系统重启、应用更新或时间变化后自动重建课程提醒。
 
-## 隐私与安全
+## 隐私
 
-- 课表和登录凭据仅保存在设备本地，不上传到第三方服务器。
-- 账号和密码使用 Android Keystore 中的 AES-GCM 密钥加密后保存。
-- 验证码不会被自动识别、破解或绕过。学校要求验证码时，应用只展示原始验证码，由用户手动输入。
-- 学校站点登录后的 HTTP 跳转例外仅限 `gsmis.njust.edu.cn` 域名；应用其余位置不允许明文流量。
-- 请勿把真实账号、密码、Cookie、私钥、签名文件或访问令牌写入源码、测试数据、日志或 Git 历史。
-
-## 项目结构
-
-项目使用 Kotlin 和原生 Android WebView，最低支持 Android 8.0（API 26）。首页为随 APK 打包的 HTML/CSS/JavaScript，不依赖远程前端资源。
-
-```text
-.
-├── app/
-│   ├── build.gradle.kts
-│   └── src/main/
-│       ├── AndroidManifest.xml
-│       ├── assets/index.html
-│       ├── java/cn/edu/njust/kezaizhangxin/
-│       │   ├── MainActivity.kt
-│       │   └── ScheduleNotificationReceiver.kt
-│       └── res/
-│           ├── drawable-nodpi/ic_launcher.png
-│           ├── values/styles.xml
-│           └── xml/network_security_config.xml
-├── gradle/wrapper/
-├── release/
-│   ├── KeZaiZhangXin-v1.0.0.apk
-│   └── KeZaiZhangXin-v1.0.0.apk.sha256
-├── build.gradle.kts
-├── settings.gradle.kts
-├── gradlew
-└── gradlew.bat
-```
-
-`release/` 保存供普通用户下载的版本化安装包；Gradle 缓存、构建输出、IDE 配置、日志和本机验证截图均由 `.gitignore` 排除，可随时重新生成。
-
-- `MainActivity.kt`：创建首页与学校 WebView，处理登录、验证码、课表抓取、本地存储和 JavaScript 桥接。
-- `index.html`：课程解析、周次过滤、页面渲染、交互与登录/验证码弹窗。
-- `ScheduleNotificationReceiver.kt`：解析本地课表、安排闹钟、处理开机重建和发送通知。
-- `network_security_config.xml`：限制学校站点所需的明文流量例外。
-
-## 同步流程
-
-```text
-首页发起同步
-  → 后台 WebView 打开学校系统
-  → 填入本地解密的账号和密码
-  → 用户手动输入学校验证码
-  → 登录后进入学期课表查询
-  → 解析课程和教学日历
-  → 保存本地 JSON
-  → 重建课程通知并刷新首页
-```
-
-学校页面的 DOM、控件 ID 或登录流程发生变化时，优先检查 `MainActivity.kt` 中的选择器与跳转逻辑。修改同步逻辑时必须保留“验证码由用户手动完成”的安全边界。
-
-## 开发环境
-
-- Android Studio 自带 JBR（Java 17）
-- Android Gradle Plugin 8.10.1
-- Kotlin 2.0.21
-- Gradle 8.11.1
-- `compileSdk` / `targetSdk`：36
-- `minSdk`：26
-- 包名：`cn.edu.njust.kezaizhangxin`
-- 当前版本：`1.0.0`（`versionCode 2`）
-
-推荐直接使用 Android Studio 打开项目，它会在本机生成不提交到 Git 的 `local.properties`。也可手动配置 Android SDK，例如：
-
-```properties
-sdk.dir=/path/to/Android/Sdk
-```
+- 课表、笔记和登录凭据仅保存在本机。
+- 密码使用 Android Keystore AES-GCM 加密。
+- 课程图片只保存系统授予的原文件引用，不复制图片。
+- 定位仅在校园地图打开时使用，不保存轨迹、不申请后台定位。
+- 验证码始终由用户手动输入，不自动识别或绕过。
 
 ## 构建
 
-首次构建需要联网下载 Gradle 和 Android 依赖。依赖准备完成后，可在 Android Studio 中构建，也可使用项目自带的 Gradle Wrapper。
-
-Windows PowerShell：
+项目使用 Kotlin、原生 Android WebView 和本地 HTML/CSS/JavaScript，包名为 `cn.edu.njust.kezaizhangxin`。
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
-```
-
-macOS / Linux：
-
-```bash
-./gradlew :app:assembleDebug
-```
-
-debug APK 输出到：
-
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
-
-构建 release APK：
-
-```powershell
 .\gradlew.bat :app:assembleRelease
 ```
 
-release APK 输出到：
-
-```text
-app/build/outputs/apk/release/app-release.apk
-```
-
-当前 release 变体使用 debug keystore 签名，适合开发测试和同学间直接安装。发布到应用商店前，必须配置独立的生产签名，并通过安全的本机配置或 CI Secret 注入签名信息，不能提交 keystore 或密码。
-
-## 安装与调试
-
-确保 Android SDK 的 `platform-tools` 已加入 `PATH`。设备或模拟器在线后可执行：
+地图源数据位于 `map-source/`，修改后运行：
 
 ```powershell
-adb devices
-adb install -r app\build\outputs\apk\debug\app-debug.apk
+.\tools\generate-map-tiles.ps1
 ```
 
-调试同步功能需要能够访问学校系统。不要在测试截图、日志或问题报告中暴露账号、验证码、Cookie 或个人课表信息。
-
-## 扩展指南
-
-### 修改首页
-
-页面样式和渲染逻辑集中在 `app/src/main/assets/index.html`。原生能力通过 `Android` JavaScript 接口提供。增加新的桥接方法时：
-
-1. 只暴露完成具体任务所需的最小接口。
-2. 对来自网页的字符串做校验，不信任页面输入。
-3. 涉及 WebView 或界面操作时切换到主线程。
-4. 不把解密后的登录凭据返回给首页 JavaScript。
-
-### 适配学校系统变化
-
-课表、登录页和教学日历依赖学校网页结构。适配新结构时，应同时验证：
-
-- 登录控件、验证码图片和提交按钮选择器。
-- 登录成功后的目标页面跳转。
-- 课表合并单元格、课程文本、教师、地点和周次解析。
-- 教学日历的学期名称、日期格式及第 1 周周一。
-- 同步失败时能回到应用首页并给出可理解的提示。
-
-### 修改通知
-
-通知时间和课表过滤位于 `ScheduleNotificationReceiver.kt`。变更时注意 PendingIntent ID 唯一性、夏令时/时区、系统重启、精确闹钟权限以及 Android 13+ 通知权限。课程解析规则应与首页保持一致，避免页面显示有课但通知缺失。
-
-## 提交前检查
-
-1. 构建 debug APK。
-2. 有设备时安装并验证首页、同步、验证码和滑动交互。
-3. 检查当天/跨周/学期开始前后的周次计算。
-4. 检查课程开始前提醒和晚间提醒。
-5. 使用 `git diff --check` 检查格式，并确认没有敏感信息或本机文件进入提交。
+请勿把账号、密码、Cookie、验证码、私钥、签名文件或访问令牌提交到仓库。
 
 ## License
 
-项目目前未声明开源许可证。在添加许可证前，默认保留所有权利；如计划接受外部贡献或发布衍生版本，请先由维护者选择并加入合适的许可证。
+项目暂未声明开源许可证，默认保留所有权利。

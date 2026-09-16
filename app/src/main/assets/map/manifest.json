@@ -1,0 +1,313 @@
+{
+  "schemaVersion": 1,
+  "coordinateSystem": "WGS84",
+  "width": 4166,
+  "height": 2399,
+  "tileSize": 512,
+  "minZoom": 0,
+  "maxZoom": 4,
+  "extension": "jpg",
+  "controlPoints": [
+    {
+      "name": "学生宿舍10",
+      "longitude": 120.15806945666668,
+      "latitude": 31.90576909166667,
+      "pixelX": 3351,
+      "pixelY": 1066
+    },
+    {
+      "name": "学生宿舍11",
+      "longitude": 120.15814753999999,
+      "latitude": 31.905851626666667,
+      "pixelX": 3630,
+      "pixelY": 1035
+    },
+    {
+      "name": "教师公寓03",
+      "longitude": 120.15911060666669,
+      "latitude": 31.90503164583334,
+      "pixelX": 3873,
+      "pixelY": 1305
+    },
+    {
+      "name": "教师公寓04",
+      "longitude": 120.15908930250002,
+      "latitude": 31.904637903333334,
+      "pixelX": 3855,
+      "pixelY": 1513
+    },
+    {
+      "name": "教师公寓05",
+      "longitude": 120.15903139333336,
+      "latitude": 31.90416757666667,
+      "pixelX": 3817,
+      "pixelY": 1674
+    },
+    {
+      "name": "教师公寓02",
+      "longitude": 120.15915564666668,
+      "latitude": 31.905494505833335,
+      "pixelX": 3874,
+      "pixelY": 1144
+    },
+    {
+      "name": "教师公寓01",
+      "longitude": 120.15920928083334,
+      "latitude": 31.906050832500007,
+      "pixelX": 3888,
+      "pixelY": 949
+    },
+    {
+      "name": "学生宿舍9/理发店/超市",
+      "longitude": 120.15821701250002,
+      "latitude": 31.906741120000003,
+      "pixelX": 3674,
+      "pixelY": 690
+    },
+    {
+      "name": "诚意楼",
+      "longitude": 120.1574512166667,
+      "latitude": 31.907077102500008,
+      "pixelX": 3412,
+      "pixelY": 626
+    },
+    {
+      "name": "明德楼",
+      "longitude": 120.1572753510253,
+      "latitude": 31.90706642857016,
+      "pixelX": 3213,
+      "pixelY": 619
+    },
+    {
+      "name": "亲民楼",
+      "longitude": 120.15653163416668,
+      "latitude": 31.907034181666667,
+      "pixelX": 2977,
+      "pixelY": 618
+    },
+    {
+      "name": "芙蓉苑",
+      "longitude": 120.15582577333333,
+      "latitude": 31.906706262500002,
+      "pixelX": 2767,
+      "pixelY": 699
+    },
+    {
+      "name": "快递/文印/鼎新大厦/师生服务大厅",
+      "longitude": 120.15404812333335,
+      "latitude": 31.906008553333344,
+      "pixelX": 2427,
+      "pixelY": 820
+    },
+    {
+      "name": "北门",
+      "longitude": 120.15358718833335,
+      "latitude": 31.907069320833333,
+      "pixelX": 2150,
+      "pixelY": 469
+    },
+    {
+      "name": "致理楼",
+      "longitude": 120.15273225166666,
+      "latitude": 31.907065184166665,
+      "pixelX": 1876,
+      "pixelY": 617
+    },
+    {
+      "name": "致新楼",
+      "longitude": 120.15295859833333,
+      "latitude": 31.906169518333336,
+      "pixelX": 1876,
+      "pixelY": 837
+    },
+    {
+      "name": "辨理堂",
+      "longitude": 120.15173416435817,
+      "latitude": 31.90636341862593,
+      "pixelX": 1614,
+      "pixelY": 742
+    },
+    {
+      "name": "樱花苑",
+      "longitude": 120.15172575833334,
+      "latitude": 31.906867198333334,
+      "pixelX": 1604,
+      "pixelY": 499
+    },
+    {
+      "name": "学生宿舍5/电信联通/水果店",
+      "longitude": 120.15124745416666,
+      "latitude": 31.907022460833332,
+      "pixelX": 1366,
+      "pixelY": 462
+    },
+    {
+      "name": "学生宿舍6",
+      "longitude": 120.15121238583333,
+      "latitude": 31.906465148333336,
+      "pixelX": 1321,
+      "pixelY": 710
+    },
+    {
+      "name": "致知楼",
+      "longitude": 120.15148731166668,
+      "latitude": 31.905995660000006,
+      "pixelX": 1470,
+      "pixelY": 924
+    },
+    {
+      "name": "致真楼",
+      "longitude": 120.15099437833335,
+      "latitude": 31.9057198225,
+      "pixelX": 1266,
+      "pixelY": 1025
+    },
+    {
+      "name": "工程训练中心",
+      "longitude": 120.14990217416667,
+      "latitude": 31.90558053166667,
+      "pixelX": 840,
+      "pixelY": 947
+    },
+    {
+      "name": "游泳馆",
+      "longitude": 120.14826436500003,
+      "latitude": 31.9052964225,
+      "pixelX": 427,
+      "pixelY": 1118
+    },
+    {
+      "name": "体育馆",
+      "longitude": 120.14812934749999,
+      "latitude": 31.905608506666663,
+      "pixelX": 425,
+      "pixelY": 924
+    },
+    {
+      "name": "西门",
+      "longitude": 120.14732310833334,
+      "latitude": 31.904749552499997,
+      "pixelX": 235,
+      "pixelY": 1286
+    },
+    {
+      "name": "国际学术交流中心",
+      "longitude": 120.1484052041667,
+      "latitude": 31.90397922166667,
+      "pixelX": 470,
+      "pixelY": 1592
+    },
+    {
+      "name": "学生宿舍1",
+      "longitude": 120.14844525666669,
+      "latitude": 31.90318473083334,
+      "pixelX": 471,
+      "pixelY": 1867
+    },
+    {
+      "name": "学生宿舍3",
+      "longitude": 120.14847852583335,
+      "latitude": 31.9021448775,
+      "pixelX": 474,
+      "pixelY": 2111
+    },
+    {
+      "name": "学生宿舍4",
+      "longitude": 120.14858821166669,
+      "latitude": 31.90254862833334,
+      "pixelX": 638,
+      "pixelY": 2113
+    },
+    {
+      "name": "学生宿舍2",
+      "longitude": 120.14854872916666,
+      "latitude": 31.9032818625,
+      "pixelX": 676,
+      "pixelY": 1859
+    },
+    {
+      "name": "兰苑",
+      "longitude": 120.1497648225,
+      "latitude": 31.903315191666668,
+      "pixelX": 986,
+      "pixelY": 1882
+    },
+    {
+      "name": "格物楼",
+      "longitude": 120.15118585666667,
+      "latitude": 31.90292135,
+      "pixelX": 1344,
+      "pixelY": 1984
+    },
+    {
+      "name": "致源楼",
+      "longitude": 120.15099484848724,
+      "latitude": 31.903896183722996,
+      "pixelX": 1323,
+      "pixelY": 1693
+    },
+    {
+      "name": "致道楼",
+      "longitude": 120.15098266999999,
+      "latitude": 31.904128577499996,
+      "pixelX": 1269,
+      "pixelY": 1511
+    },
+    {
+      "name": "钟楼",
+      "longitude": 120.15241340583336,
+      "latitude": 31.904212398333332,
+      "pixelX": 1782,
+      "pixelY": 1537
+    },
+    {
+      "name": "正心楼",
+      "longitude": 120.15227225166667,
+      "latitude": 31.903767015833342,
+      "pixelX": 1659,
+      "pixelY": 1672
+    },
+    {
+      "name": "致远楼",
+      "longitude": 120.15249405750004,
+      "latitude": 31.90316925083334,
+      "pixelX": 1823,
+      "pixelY": 2028
+    },
+    {
+      "name": "南门",
+      "longitude": 120.15375764400002,
+      "latitude": 31.902463795999996,
+      "pixelX": 2148,
+      "pixelY": 2235
+    },
+    {
+      "name": "行政楼",
+      "longitude": 120.154781375,
+      "latitude": 31.902349040000008,
+      "pixelX": 2488,
+      "pixelY": 2181
+    },
+    {
+      "name": "至善楼",
+      "longitude": 120.1548595275,
+      "latitude": 31.903005109166667,
+      "pixelX": 2478,
+      "pixelY": 1985
+    },
+    {
+      "name": "图书馆",
+      "longitude": 120.1536678525,
+      "latitude": 31.904809691666667,
+      "pixelX": 2150,
+      "pixelY": 1313
+    },
+    {
+      "name": "专家楼01",
+      "longitude": 120.15500996750002,
+      "latitude": 31.905534518333333,
+      "pixelX": 2613,
+      "pixelY": 1158
+    }
+  ]
+}
