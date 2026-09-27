@@ -21,6 +21,8 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.view.Surface
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
@@ -101,12 +103,33 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         schoolWebView = createWebView(SchoolBridge(), SchoolWebViewClient())
         webView = createWebView(HomeBridge(), WebViewClient())
-        setContentView(android.widget.FrameLayout(this).apply {
+        // Keep both WebViews inside the usable window, including on Android 15+
+        // where edge-to-edge layout is enforced. Insets also cover cutouts and IME.
+        if (Build.VERSION.SDK_INT >= 30) {
+            window.setDecorFitsSystemWindows(false)
+            window.insetsController?.setSystemBarsAppearance(
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            )
+        }
+        val content = android.widget.FrameLayout(this).apply {
+            setBackgroundColor(android.graphics.Color.rgb(250, 250, 250))
+            if (Build.VERSION.SDK_INT >= 30) {
+                setOnApplyWindowInsetsListener { view, insets ->
+                    val safe = insets.getInsets(
+                        WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime()
+                    )
+                    view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+                    WindowInsets.CONSUMED
+                }
+            }
             // The school WebView is kept behind the home screen. It can finish a
             // valid session refresh without exposing the school's intermediate UI.
             addView(schoolWebView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             addView(webView, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        })
+        }
+        setContentView(content)
+        content.requestApplyInsets()
         webView.loadUrl("file:///android_asset/index.html")
         if (Build.VERSION.SDK_INT >= 33) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, ::handleBackNavigation)

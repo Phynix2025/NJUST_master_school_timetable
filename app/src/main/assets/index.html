@@ -7,23 +7,18 @@
 </head>
 <body>
   <div id="scheduleScreen">
-    <header class="top">
-      <div class="title-row">
-        <h1>课在掌心</h1>
+    <header class="schedule-header">
+      <div class="schedule-toolbar">
+        <label class="week-picker"><select id="weekSelect" aria-label="选择周次"></select></label>
+        <button id="currentWeek">回到本周</button>
         <button class="sync" onclick="startSync()">同步课表</button>
+        <button id="mapFab" aria-label="打开校园地图"><span id="mapFabIcon">⌖</span><span id="mapFabText">地图</span></button>
       </div>
-      <p id="status">把本学期课程放到手机里</p>
+      <div id="weekDates" class="week-dates"></div>
     </header>
-    <nav class="tabs">
-      <button class="tab active" data-view="today">今天</button>
-      <button class="tab" data-view="tomorrow">明天</button>
-      <button class="tab" data-view="week">本周</button>
-    </nav>
-    <main class="main">
-      <h2 class="section-title" id="heading"></h2>
-      <p class="subtitle" id="subtitle"></p>
-      <div id="next"></div>
-      <div id="list"></div>
+    <main class="timetable-main">
+      <div id="scheduleNotice" role="status"></div>
+      <div id="list" class="timetable" aria-label="每周课程表"></div>
     </main>
   </div>
 
@@ -91,10 +86,6 @@
     </div>
   </section>
 
-  <button class="map-fab" id="mapFab" aria-label="打开校园地图">
-    <span id="mapFabIcon">⌖</span><span id="mapFabText">地图</span>
-  </button>
-  <div class="footer">课表仅保存在本机 · 登录凭据经设备密钥加密保存</div>
 
   <section class="mask hidden" id="loginMask">
     <div class="login-panel">

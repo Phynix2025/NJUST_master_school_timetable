@@ -1,6 +1,7 @@
 const times={1:'08:00–08:45',2:'08:50–09:35',3:'09:40–10:25',4:'10:40–11:25',5:'11:30–12:15',6:'14:00–14:45',7:'14:50–15:35',8:'15:50–16:35',9:'16:40–17:25',10:'17:30–18:15',11:'19:00–19:45',12:'19:50–20:35',13:'20:40–21:25'};
 const weekdays=['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
-let view='today';
+let displayedMonday=monday(new Date());
+let suppressCourseClickUntil=0;
 let schedule=null;
 let renderedCourseCards=[];
 const courseDetailsCache=new Map();
@@ -18,10 +19,10 @@ function weekNo(date){
   if(!schedule)return 0;
   if(schedule.termWeek1){const start=monday(new Date(`${schedule.termWeek1}T12:00:00`));return Math.floor((monday(date)-start)/604800000)+1}
   if(!schedule.syncWeek)return 0;
-  return schedule.syncWeek+Math.round((monday(date)-monday(new Date()))/604800000);
+  return schedule.syncWeek+Math.round((monday(date)-monday(new Date(schedule.syncedAt||Date.now())))/604800000);
 }
 function inWeeks(spec,week){
-  if(!week)return true;
+  if(!week||!spec.trim())return true;
   return (spec.match(/\d+(?:\s*[-–]\s*\d+)?/g)||[]).some(part=>{
     const bounds=part.split(/[-–]/).map(value=>Number(value.trim()));
     return bounds.length===1?bounds[0]===week:week>=bounds[0]&&week<=bounds[1];
@@ -43,12 +44,11 @@ function parseCourseText(text,slot){
 function mergeCourses(courses){
   const merged=[];
   courses.forEach(course=>{
-    const previous=merged[merged.length-1];
-    const same=previous&&previous.name===course.name&&previous.teacher===course.teacher&&previous.place===course.place&&previous.weeks===course.weeks&&previous.sectionEnd===course.section-1;
-    if(same)previous.sectionEnd=course.section;
+    const previous=merged.find(item=>item.name===course.name&&item.teacher===course.teacher&&item.place===course.place&&item.weeks===course.weeks&&item.sectionEnd===course.section-1);
+    if(previous)previous.sectionEnd=course.section;
     else merged.push({...course,sectionEnd:course.section});
   });
-  return merged;
+  return merged.sort((a,b)=>a.section-b.section);
 }
 function coursesOn(date){
   if(!schedule)return[];
@@ -78,93 +78,56 @@ function readCourseDetails(course){
   details={text:String(details.text||''),images:Array.isArray(details.images)?details.images.filter(uri=>String(uri).startsWith('content://')):[]};
   courseDetailsCache.set(key,details);return details;
 }
-function card(course,date,forcedState){
-  const state=forcedState===undefined?stateOf(course,date):forcedState;
-  const label=state==='finished'?'已完成':state==='live'?'进行中':'';
-  const details=readCourseDetails(course),hasDetails=details.text.trim()||details.images.length;
-  const cardIndex=renderedCourseCards.push({course,date})-1;
-  return `<article class="card ${state}" data-course-card="${cardIndex}" role="button" tabindex="0"><div class="time">${periodTime(course)} · ${sectionLabel(course)}${label?`<span class="state ${state}">${label}</span>`:''}</div><div class="name">${esc(course.name)}</div>${course.place?`<div class="info"><span class="icon">⌖</span><span>${esc(course.place)}</span></div>`:''}${course.teacher?`<div class="info"><span class="icon">♙</span><span>${esc(course.teacher)}</span></div>`:''}<div class="info"><span class="icon">◷</span><span>${esc(course.weeks||'本学期')}周</span></div>${hasDetails?`<div class="course-has-details">${details.images.length?'▧ ':''}${details.text.trim()?'✎ ':''}已保存课程资料</div>`:''}<span class="card-chevron">›</span></article>`;
-}
-function orderedCourses(date){
-  const courses=coursesOn(date);
-  return date.toDateString()===new Date().toDateString()?courses.sort((a,b)=>{
-    const rank=course=>({live:0,'':1,finished:2}[stateOf(course,date)]);
-    return rank(a)-rank(b)||a.section-b.section;
-  }):courses;
-}
-function empty(date){return `<div class="notice">${fmt(date)}没有课程。安排好学习与休息，保持从容。</div>`}
-function nextCourse(){
-  const now=new Date();
-  for(let offset=0;offset<14;offset++){
-    const date=dateAt(now,offset),courses=coursesOn(date);
-    for(const course of courses){
-      const end=minute(times[course.sectionEnd].split('–')[1]),clock=now.getHours()*60+now.getMinutes();
-      if(offset||clock<end)return{course,date};
-    }
-  }
-  return null;
-}
 function nextCourseToday(){
   const now=new Date(),clock=now.getHours()*60+now.getMinutes();
   const course=coursesOn(now).find(item=>minute(times[item.section].split('–')[0])>clock);
   return course||null;
 }
-function showNext(){
-  const next=nextCourse(),box=document.getElementById('next');
-  box.innerHTML=next?`<div class="next"><span class="badge">下一节</span><div><b>${esc(next.course.name)}</b>${fmt(next.date)} ${periodTime(next.course)} · ${esc(next.course.place||'地点待定')}</div></div>`:'';
+// Course identity and detail storage remain shared across all weeks.
+function courseColor(course){
+  let hash=0;for(const character of courseKey(course))hash=(hash*31+character.charCodeAt(0))|0;
+  return Math.abs(hash)%6;
 }
-function weekQueue(){
-  const start=monday(new Date()),items=[];
-  for(let offset=0;offset<7;offset++){
-    const date=dateAt(start,offset);
-    coursesOn(date).forEach(course=>items.push({course,date,state:weekStateOf(course,date)}));
-  }
-  const rank=state=>({live:0,'':1,finished:2}[state]);
-  return items.sort((a,b)=>{
-    const stateRank=rank(a.state)-rank(b.state);
-    if(stateRank)return stateRank;
-    if(a.state==='finished')return b.date-a.date||b.course.section-a.course.section;
-    return a.date-b.date||a.course.section-b.course.section;
-  });
-}
-function renderWeekQueue(now){
-  const items=weekQueue();
-  let html='',last='';
-  items.forEach(item=>{
-    const key=item.date.toDateString();
-    if(key!==last){
-      if(last)html+='</section>';
-      html+=`<section class="week-day"><div class="day">${weekdays[item.date.getDay()]} · ${fmt(item.date)}${key===now.toDateString()?' · 今天':''}</div>`;
-      last=key;
-    }
-    html+=card(item.course,item.date,item.state);
-  });
-  return html+(last?'</section>':'');
-}
+function changeWeek(offset){displayedMonday=dateAt(displayedMonday,offset*7);render()}
 function render(){
   renderedCourseCards=[];
-  const now=new Date(),target=view==='tomorrow'?dateAt(now,1):now;
-  document.querySelectorAll('.tab').forEach(button=>button.classList.toggle('active',button.dataset.view===view));
-  document.getElementById('status').textContent='一切数据以学校官网为准';
-  if(!schedule){
-    document.getElementById('heading').textContent='还没有课程表';
-    document.getElementById('subtitle').textContent='同步后即可按周次查看今天、明天和本周课程';
-    document.getElementById('next').innerHTML='';
-    document.getElementById('list').innerHTML='<div class="notice">点击“同步课表”后输入账号密码；验证码仅在学校要求时手动完成一次。</div>';
-    return;
+  const now=new Date(),start=displayedMonday,current=monday(now),number=weekNo(start);
+  document.getElementById('currentWeek').disabled=start.getTime()===current.getTime();
+  const select=document.getElementById('weekSelect');
+  const currentNumber=weekNo(current),first=Math.min(1,number||1),last=Math.max(25,number,currentNumber);
+  select.innerHTML=schedule&&number?Array.from({length:last-first+1},(_,i)=>{
+    const n=first+i;return `<option value="${n}" ${n===number?'selected':''}>第 ${n} 周</option>`;
+  }).join(''):`<option>${fmt(start)}起</option>`;
+  select.disabled=!schedule||!number;
+  const end=dateAt(start,6),month=start.getMonth()===end.getMonth()?`${start.getMonth()+1}月`:`${start.getMonth()+1}/${end.getMonth()+1}月`;
+  document.getElementById('weekDates').innerHTML=`<div class="month-label">${month}</div>`+Array.from({length:7},(_,i)=>{
+    const date=dateAt(start,i);return `<div class="date-label ${date.toDateString()===now.toDateString()?'is-today':''}"><span>${['一','二','三','四','五','六','日'][i]}</span><b>${date.getDate()}</b></div>`;
+  }).join('');
+  const notice=document.getElementById('scheduleNotice');
+  if(!schedule){notice.innerHTML='<div class="notice">还没有课程表，点击“同步课表”开始使用。</div>';document.getElementById('list').innerHTML='';return}
+  let html=Object.entries(times).map(([section,time])=>`<div class="period-label" style="grid-row:${section};grid-column:1"><b>${section}</b><span>${time.split('–').join('<br>')}</span></div><div class="period-line" style="grid-row:${section};grid-column:2 / 9"></div>`).join('');
+  let total=0;
+  for(let day=0;day<7;day++){
+    const date=dateAt(start,day),courses=coursesOn(date);total+=courses.length;
+    // Group intersecting meetings so no card hides another course.
+    const groups=[];
+    courses.forEach(course=>{
+      let group=groups[groups.length-1];
+      if(!group||course.section>group.end){group={start:course.section,end:course.sectionEnd,courses:[]};groups.push(group)}
+      group.end=Math.max(group.end,course.sectionEnd);group.courses.push(course);
+    });
+    groups.forEach(group=>{
+      html+=`<div class="course-group" style="grid-column:${day+2};grid-row:${group.start} / ${group.end+1};grid-template-rows:repeat(${group.end-group.start+1},minmax(0,1fr))">`;
+      group.courses.forEach((course,index)=>{
+        const cardIndex=renderedCourseCards.push({course,date})-1,state=weekStateOf(course,date),details=readCourseDetails(course);
+        const label=state==='finished'?'已完成':state==='live'?'进行中':'';
+        html+=`<button class="course-block color-${courseColor(course)} ${state}" data-course-card="${cardIndex}" style="grid-row:${course.section-group.start+1} / ${course.sectionEnd-group.start+2};grid-column:${index+1}" aria-label="${escAttr(`${course.name}，${fmt(date)}，${periodTime(course)}，${course.place}，${label}`)}"><span class="course-name">${esc(course.name)}</span>${course.place?`<span class="course-place">@${esc(course.place)}</span>`:''}${label?`<span class="course-status">${label}</span>`:''}${details.text.trim()||details.images.length?'<span class="detail-dot" aria-label="已保存课程资料"></span>':''}</button>`;
+      });
+      html+='</div>';
+    });
   }
-  showNext();
-  if(view==='week'){
-    const start=monday(now);
-    document.getElementById('heading').textContent=`第 ${weekNo(now)||'—'} 周课程`;
-    document.getElementById('subtitle').textContent=`${fmt(start)}—${fmt(dateAt(start,6))} · 已完成课程排在最后`;
-    document.getElementById('list').innerHTML=renderWeekQueue(now)||empty(now);
-    return;
-  }
-  const courses=orderedCourses(target),name=view==='today'?'今天':'明天';
-  document.getElementById('heading').textContent=`${name} · ${weekdays[target.getDay()]}`;
-  document.getElementById('subtitle').textContent=`${fmt(target)} · 第 ${weekNo(target)||'—'} 周 · ${courses.length} 门课程`;
-  document.getElementById('list').innerHTML=courses.length?courses.map(course=>card(course,target)).join(''):empty(target);
+  notice.innerHTML=total?'':'<div class="week-empty">本周没有课程</div>';
+  document.getElementById('list').innerHTML=html;
 }
 
 function detailImageMarkup(uri,index){
@@ -503,6 +466,8 @@ function renderMap(){
   });
 }
 function openMap(){
+  document.body.classList.add('map-open');
+  document.getElementById('mapFab').setAttribute('aria-label','返回课程表');
   mapState.active=true;mapScreen.classList.remove('hidden');document.body.style.overflow='hidden';
   if(window.Android&&Android.setMapOpen)Android.setMapOpen(true);
   document.getElementById('mapFabText').textContent='课表';document.getElementById('mapFabIcon').textContent='▤';
@@ -510,6 +475,8 @@ function openMap(){
   requestAnimationFrame(()=>{fitWholeMap();if(!mapState.target)chooseDefaultTarget();if(window.Android&&Android.requestLocation)Android.requestLocation()});
 }
 function closeMap(){
+  document.body.classList.remove('map-open');
+  document.getElementById('mapFab').setAttribute('aria-label','打开校园地图');
   mapState.active=false;mapScreen.classList.add('hidden');document.body.style.overflow='';hideSearchResults();
   if(window.Android&&Android.setMapOpen)Android.setMapOpen(false);
   document.getElementById('mapFabText').textContent='地图';document.getElementById('mapFabIcon').textContent='⌖';
@@ -605,9 +572,10 @@ function refreshAtNextMinute(){
   const now=new Date();setTimeout(tick,60000-now.getSeconds()*1000-now.getMilliseconds());
 }
 
-document.querySelectorAll('.tab').forEach(button=>button.onclick=()=>{view=button.dataset.view;render()});
-document.getElementById('list').addEventListener('click',event=>{const card=event.target.closest('[data-course-card]');if(card)openCourseDetail(renderedCourseCards[Number(card.dataset.courseCard)])});
-document.getElementById('list').addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.matches('[data-course-card]')){event.preventDefault();openCourseDetail(renderedCourseCards[Number(event.target.dataset.courseCard)])}});
+document.getElementById('currentWeek').onclick=()=>{displayedMonday=monday(new Date());render()};
+document.getElementById('weekSelect').onchange=event=>changeWeek(Number(event.target.value)-weekNo(displayedMonday));
+document.getElementById('list').addEventListener('click',event=>{const card=event.target.closest('[data-course-card]');if(card&&Date.now()>suppressCourseClickUntil)openCourseDetail(renderedCourseCards[Number(card.dataset.courseCard)])});
+
 document.getElementById('detailBack').onclick=closeCourseDetail;
 document.getElementById('courseNote').addEventListener('input',()=>{document.getElementById('noteSaveStatus').textContent='正在保存…';clearTimeout(noteSaveTimer);noteSaveTimer=setTimeout(saveActiveCourseNote,500)});
 document.getElementById('courseNote').addEventListener('blur',saveActiveCourseNote);
@@ -623,8 +591,24 @@ document.getElementById('zoomInButton').onclick=()=>setScaleAround(mapState.scal
 document.getElementById('zoomOutButton').onclick=()=>setScaleAround(mapState.scale/1.4,mapViewport.clientWidth/2,mapViewport.clientHeight/2);
 window.addEventListener('resize',()=>{if(mapState.active){constrainMap();renderMap()}});
 let swipeStart=null;
-document.getElementById('scheduleScreen').addEventListener('touchstart',event=>{if(event.touches.length!==1||event.target.closest('input,button,.login-panel'))return;swipeStart={x:event.touches[0].clientX,y:event.touches[0].clientY}},{passive:true});
-document.getElementById('scheduleScreen').addEventListener('touchend',event=>{if(!swipeStart)return;const end=event.changedTouches[0],deltaX=end.clientX-swipeStart.x,deltaY=end.clientY-swipeStart.y;swipeStart=null;if(Math.abs(deltaX)<60||Math.abs(deltaX)<=Math.abs(deltaY))return;const views=['today','tomorrow','week'],index=views.indexOf(view),next=index+(deltaX<0?1:-1);if(next>=0&&next<views.length){view=views[next];render()}},{passive:true});
+const scheduleSurface=document.querySelector('.timetable-main');
+scheduleSurface.addEventListener('touchstart',event=>{
+  swipeStart=event.touches.length===1?{x:event.touches[0].clientX,y:event.touches[0].clientY}:null;
+},{passive:true});
+scheduleSurface.addEventListener('touchmove',event=>{
+  if(!swipeStart)return;
+  if(event.touches.length!==1){swipeStart=null;return}
+  const dx=event.touches[0].clientX-swipeStart.x,dy=event.touches[0].clientY-swipeStart.y;
+  if(Math.abs(dx)>10||Math.abs(dy)>10)suppressCourseClickUntil=Date.now()+500;
+  if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>15)swipeStart=null;
+},{passive:true});
+scheduleSurface.addEventListener('touchcancel',()=>{swipeStart=null});
+scheduleSurface.addEventListener('touchend',event=>{
+  if(!swipeStart)return;
+  const end=event.changedTouches[0],dx=end.clientX-swipeStart.x,dy=end.clientY-swipeStart.y;swipeStart=null;
+  if(Math.abs(dx)<60||Math.abs(dx)<=Math.abs(dy)*1.5)return;
+  suppressCourseClickUntil=Date.now()+500;changeWeek(dx<0?1:-1);
+},{passive:true});
 
 try{const raw=Android.getSchedule();schedule=raw?JSON.parse(raw):null}catch(_){schedule=null}
 notice();render();refreshAtNextMinute();
