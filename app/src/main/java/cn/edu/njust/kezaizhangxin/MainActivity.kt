@@ -40,6 +40,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 class MainActivity : Activity() {
+    private lateinit var updater: AppUpdater
     private lateinit var webView: WebView
     private lateinit var schoolWebView: WebView
     private val prefs by lazy { getSharedPreferences("schedule", MODE_PRIVATE) }
@@ -101,6 +102,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        updater = AppUpdater(this)
         schoolWebView = createWebView(SchoolBridge(), SchoolWebViewClient())
         webView = createWebView(HomeBridge(), WebViewClient())
         // Keep both WebViews inside the usable window, including on Android 15+
@@ -139,7 +141,8 @@ class MainActivity : Activity() {
         NotificationScheduler.schedule(this)
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    // Callers pass HomeBridge or SchoolBridge; their public methods have @JavascriptInterface.
+    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     private fun createWebView(bridge: Any, client: WebViewClient): WebView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -222,17 +225,20 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (::updater.isInitialized) updater.resume()
         if (locationRequested) startLocationUpdates()
         if (mapOpen) startHeadingUpdates()
     }
 
     override fun onPause() {
+        if (::updater.isInitialized) updater.pause()
         stopLocationUpdates(clearRequest = false)
         stopHeadingUpdates()
         super.onPause()
     }
 
     override fun onDestroy() {
+        if (::updater.isInitialized) updater.close()
         stopLocationUpdates(clearRequest = true)
         stopHeadingUpdates()
         super.onDestroy()
@@ -529,6 +535,7 @@ class MainActivity : Activity() {
     }
 
     inner class HomeBridge {
+        @JavascriptInterface fun showUpdateMenu() = runOnUiThread { updater.showMenu() }
         @JavascriptInterface fun beginSync() = runOnUiThread { this@MainActivity.beginSync() }
         @JavascriptInterface fun login(username: String, password: String) = runOnUiThread {
             if (username.isBlank() || password.isBlank()) return@runOnUiThread

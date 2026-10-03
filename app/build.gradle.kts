@@ -17,8 +17,8 @@ android {
         applicationId = "cn.edu.njust.kezaizhangxin"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "2.1.0"
+        versionCode = 6
+        versionName = "2.2.0"
     }
 
     signingConfigs {
@@ -36,4 +36,8 @@ android {
 
 kotlin {
     jvmToolchain(17)
+}
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
 }

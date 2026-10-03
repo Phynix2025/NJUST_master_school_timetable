@@ -13,6 +13,7 @@
         <button id="currentWeek">回到本周</button>
         <button class="sync" onclick="startSync()">同步课表</button>
         <button id="mapFab" aria-label="打开校园地图"><span id="mapFabIcon">⌖</span><span id="mapFabText">地图</span></button>
+        <button id="moreButton" aria-label="更多：检查更新" onclick="if(window.Android &amp;&amp; Android.showUpdateMenu) Android.showUpdateMenu()">⋮</button>
       </div>
       <div id="weekDates" class="week-dates"></div>
     </header>
@@ -54,7 +55,6 @@
       </div>
     </div>
     <div class="map-header">
-      <div class="map-heading-row"><strong>校园地图</strong><span>一切数据以学校官网为准</span></div>
       <div class="map-search-wrap">
         <span class="search-icon">⌕</span>
         <input id="buildingSearch" type="search" placeholder="搜索教学楼、食堂或校门" autocomplete="off">

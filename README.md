@@ -4,12 +4,13 @@
 
 ## 下载
 
-[下载 v2.1.0 APK](https://github.com/Phynix2025/NJUST_master_school_timetable/releases/download/v2.1.0/KeZaiZhangXin-v2.1.0.apk)
+[下载 v2.2.0 APK](https://github.com/Phynix2025/NJUST_master_school_timetable/releases/download/v2.2.0/KeZaiZhangXin-v2.2.0.apk)
 
 当前发布包使用开发签名，适合个人和同学间测试，不用于应用商店发布。最低支持 Android 8.0。
 
 ## 核心功能
 
+- 顶部更多菜单支持手动检查更新，用户确认后下载、校验并调用系统安装器；覆盖升级保留数据并清理应用管理的更新文件。
 - 七列周课表，左右滑动查看上／下周，支持选择周次和回到本周。
 - 课程按实际节次定位，连堂跨行显示；已完成课程变灰，进行中课程高亮。
 - 卡片显示课程名和地点，点击查看教师、完整课程信息、笔记和图片；地图入口位于顶部。

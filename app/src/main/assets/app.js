@@ -467,19 +467,15 @@ function renderMap(){
 }
 function openMap(){
   document.body.classList.add('map-open');
-  document.getElementById('mapFab').setAttribute('aria-label','返回课程表');
   mapState.active=true;mapScreen.classList.remove('hidden');document.body.style.overflow='hidden';
   if(window.Android&&Android.setMapOpen)Android.setMapOpen(true);
-  document.getElementById('mapFabText').textContent='课表';document.getElementById('mapFabIcon').textContent='▤';
   if(!initializeMap())return;
   requestAnimationFrame(()=>{fitWholeMap();if(!mapState.target)chooseDefaultTarget();if(window.Android&&Android.requestLocation)Android.requestLocation()});
 }
 function closeMap(){
   document.body.classList.remove('map-open');
-  document.getElementById('mapFab').setAttribute('aria-label','打开校园地图');
   mapState.active=false;mapScreen.classList.add('hidden');document.body.style.overflow='';hideSearchResults();
   if(window.Android&&Android.setMapOpen)Android.setMapOpen(false);
-  document.getElementById('mapFabText').textContent='地图';document.getElementById('mapFabIcon').textContent='⌖';
   if(window.Android&&Android.stopLocation)Android.stopLocation();
 }
 function toggleMap(){mapState.active?closeMap():openMap()}

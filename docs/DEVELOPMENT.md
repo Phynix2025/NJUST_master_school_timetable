@@ -42,6 +42,7 @@ npm test
 - `app/src/main/assets/app.js`：周次与课程解析、交互、笔记和地图逻辑。
 - `MainActivity.kt`：WebView 桥接、同步、加密凭据、图片引用、窗口边距和定位。
 - `ScheduleNotificationReceiver.kt`：通知调度与接收。
+- `AppUpdater.kt`、`UpdatePolicy.kt`、`UpdateApkProvider.kt`：更新检查、持久下载任务、安装前校验和只读 APK 授权。真机验收见 [更新测试说明](UPDATE-TESTING.md)。
 
 课程详情按课程名称与教师生成标识；修改此规则需要考虑既有笔记迁移。网页通过 `Android` 桥接访问本地数据，不能把登录凭据注入页面或提交到仓库。
 
@@ -59,9 +60,9 @@ npm test
 
 1. 更新 `app/build.gradle.kts` 的 `versionName` 和递增的 `versionCode`，同步 `package.json`、README 与 CHANGELOG。
 2. 执行浏览器测试、Debug 和 Release 构建；按改动范围完成设备验证。
-3. 将 Release APK 复制到 `dist/KeZaiZhangXin-v<版本>.apk`，生成同名 `.sha256` 校验文件。
+3. 执行 `.\tools\prepare-update.ps1 -Variant release`，在 `dist/release/` 生成命名 APK、SHA-256 文件与 `update.json`。
 4. 提交源码和文档；推送提交及 `v<版本>` 标签。
-5. 创建 GitHub Release，上传 APK 和 SHA-256 文件，并附上对应更新记录。
+5. 创建 GitHub Release 草稿，上传 APK、SHA-256 文件和 `update.json`，附上更新记录，检查齐全后发布。
 
 当前 Release 构建沿用本机开发签名。覆盖安装必须使用与旧版相同的签名；换电脑或重建签名可能导致无法覆盖安装。不要通过卸载应用解决签名问题，否则本地课表和笔记可能丢失。签名文件不得提交到 GitHub。
 
